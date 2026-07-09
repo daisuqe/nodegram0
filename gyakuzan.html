@@ -62,7 +62,7 @@
     min-width: 0; min-height: 0;
   }
   @media (orientation: landscape) { #fieldPanel { flex: 1 1 auto; } #calcPanel { flex: 0 0 clamp(300px, 46vw, 520px); } }
-  @media (orientation: portrait)  { #fieldPanel { flex: 1 1 34%; } #calcPanel { flex: 1 1 66%; } }
+  @media (orientation: portrait)  { #fieldPanel { flex: 1 1 43%; } #calcPanel { flex: 1 1 57%; } }
 
   .field-wrap {
     background: var(--panel); border: 1px solid var(--panel-border);
@@ -118,7 +118,7 @@
     display: flex; align-items: center; justify-content: flex-end; overflow: hidden;
   }
   .display .line {
-    font-size: clamp(20px,3.6vmin,32px); letter-spacing: .03em; line-height: 1.25;
+    font-size: clamp(40px,7.2vmin,64px); letter-spacing: .03em; line-height: 1.2;
     font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden;
     width: 100%; text-align: right;
   }
@@ -380,14 +380,25 @@ let cellW=60, cellH=40, blockW=52, blockH=34, fieldW=0, fieldH=0, gap=8;
 function layout(){
   const panel=document.getElementById('fieldPanel');
   const availW=panel.clientWidth-20, availH=panel.clientHeight-20; // minus wrap padding
-  cellH=availH/ROWS;                         // fill height first
-  let ratio=1.5;                             // desired block aspect (w:h)
-  if(cellH*ratio*COLS > availW){             // not enough width for 1.5×
-    ratio=(availW/COLS)/cellH;               // widest ratio that still fits
-    if(ratio<1){ ratio=1; cellH=availW/COLS; } // width-bound: fall back to square
+  const portrait=window.matchMedia('(orientation: portrait)').matches;
+  let ratio=1.5, cH, cW;                      // desired block aspect (w:h) = 1.5
+  if(portrait){
+    cW=availW/COLS; cH=cW/ratio;             // fill full width, blocks 1.5×
+    if(cH*ROWS>availH){                       // too tall -> become height-bound
+      cH=availH/ROWS; ratio=Math.min(1.5,(availW/COLS)/cH);
+      if(ratio<1){ ratio=1; cH=availW/COLS; }
+    }
+  } else {
+    cH=availH/ROWS;                           // landscape: fill height
+    if(cH*ratio*COLS>availW){ ratio=(availW/COLS)/cH; if(ratio<1){ ratio=1; cH=availW/COLS; } }
   }
-  cellH=Math.max(18, Math.floor(cellH));
-  cellW=Math.floor(cellH*ratio);
+  if(portrait){                              // width-primary so the field fills the screen width
+    cellW=Math.max(27, Math.floor(cW));
+    cellH=Math.max(18, Math.round(cellW/ratio));
+  } else {                                    // landscape: height-primary
+    cellH=Math.max(18, Math.floor(cH));
+    cellW=Math.floor(cellH*ratio);
+  }
   gap=Math.round(Math.min(cellW,cellH)*0.16);
   blockH=cellH-gap; blockW=Math.round(blockH*ratio); // block aspect == ratio exactly
   fieldW=cellW*COLS; fieldH=cellH*ROWS;
@@ -559,6 +570,14 @@ function fieldShake(){ const w=document.querySelector('.field-wrap'); w.classLis
 
 /* ---- calculator ---- */
 const keyEls={}; document.querySelectorAll('.key[data-k]').forEach(el=>{ keyEls[el.dataset.k]=el; });
+// key glyphs ~70% of button height
+function sizeKeys(){
+  const sample=keyEls['7']; if(!sample) return; const h=sample.getBoundingClientRect().height; if(!h) return;
+  const fs=Math.round(h*0.7);
+  document.querySelectorAll('.key[data-k]').forEach(k=>{ k.style.fontSize=fs+'px'; });
+  if(keyEls['C']) keyEls['C'].style.fontSize=Math.round(h*0.5)+'px';   // 'C' label a touch smaller
+}
+new ResizeObserver(sizeKeys).observe(document.getElementById('keys'));
 const DISP={'*':'×','/':'÷','-':'−','+':'＋'};
 function exprStr(){ return tokens.map(t=>DISP[t]||t).join(''); }
 // one-line display: expression + live "＝ value" when evaluatable
